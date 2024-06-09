@@ -90,15 +90,14 @@ void write_matrix_to_file(Matrix matrix, const char *file_name) {
 
 int main(int argc, char *argv[]) {
     // 检查参数数量
-    if (argc != 9) {
-        fprintf(stderr, "Usage: %s -a a_matrix_file.txt -b b_matrix_file.txt -t thread_count -o result_matrix.txt\n", argv[0]);
+    if (argc != 7) {
+        fprintf(stderr, "Usage: %s -a a_matrix_file.txt -b b_matrix_file.txt -o result_matrix.txt\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     char *a_file = NULL;
     char *b_file = NULL;
     char *output_file = NULL;
-    int thread_count = 0;
 
     // 解析命令行参数
     for (int i = 1; i < argc; i += 2) {
@@ -106,8 +105,6 @@ int main(int argc, char *argv[]) {
             a_file = argv[i + 1];
         } else if (strcmp(argv[i], "-b") == 0) {
             b_file = argv[i + 1];
-        } else if (strcmp(argv[i], "-t") == 0) {
-            thread_count = atoi(argv[i + 1]);
         } else if (strcmp(argv[i], "-o") == 0) {
             output_file = argv[i + 1];
         } else {
@@ -117,9 +114,9 @@ int main(int argc, char *argv[]) {
     }
 
     // 检查参数是否解析正确
-    if (!a_file || !b_file || !output_file || thread_count <= 0) {
+    if (!a_file || !b_file || !output_file) {
         fprintf(stderr, "Invalid arguments\n");
-        fprintf(stderr, "Usage: %s -a a_matrix_file.txt -b b_matrix_file.txt -t thread_count -o result_matrix.txt\n", argv[0]);
+        fprintf(stderr, "Usage: %s -a a_matrix_file.txt -b b_matrix_file.txt -o result_matrix.txt\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -134,36 +131,43 @@ int main(int argc, char *argv[]) {
     }
 
     Matrix result = { a.rows, b.cols, (double *)malloc(a.rows * b.cols * sizeof(double)) };
-    pthread_t threads[thread_count];
-    ThreadData thread_data[thread_count];
 
-    int rows_per_thread = a.rows / thread_count;
-    int extra_rows = a.rows % thread_count;
+    int thread_counts[] = {1, 2, 4, 8, 16};  // 要测试的线程数数组
+    int num_tests = sizeof(thread_counts) / sizeof(thread_counts[0]);
 
-    clock_t start_time = clock();
+    for (int test = 0; test < num_tests; test++) {
+        int thread_count = thread_counts[test];
+        pthread_t threads[thread_count];
+        ThreadData thread_data[thread_count];
 
-    for (int i = 0; i < thread_count; i++) {
-        int start_row = i * rows_per_thread;
-        int end_row = (i + 1) * rows_per_thread;
-        if (i < extra_rows) {
-            start_row += i;
-            end_row += (i + 1);
-        } else {
-            start_row += extra_rows;
-            end_row += extra_rows;
+        int rows_per_thread = a.rows / thread_count;
+        int extra_rows = a.rows % thread_count;
+
+        clock_t start_time = clock();
+
+        for (int i = 0; i < thread_count; i++) {
+            int start_row = i * rows_per_thread;
+            int end_row = (i + 1) * rows_per_thread;
+            if (i < extra_rows) {
+                start_row += i;
+                end_row += (i + 1);
+            } else {
+                start_row += extra_rows;
+                end_row += extra_rows;
+            }
+
+            thread_data[i] = (ThreadData){ &a, &b, &result, start_row, end_row };
+            pthread_create(&threads[i], NULL, matrix_multiply_thread, &thread_data[i]);
         }
 
-        thread_data[i] = (ThreadData){ &a, &b, &result, start_row, end_row };
-        pthread_create(&threads[i], NULL, matrix_multiply_thread, &thread_data[i]);
-    }
+        for (int i = 0; i < thread_count; i++) {
+            pthread_join(threads[i], NULL);
+        }
 
-    for (int i = 0; i < thread_count; i++) {
-        pthread_join(threads[i], NULL);
+        clock_t end_time = clock();
+        double time_taken = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+        printf("Threads: %d, Time taken: %f seconds\n", thread_count, time_taken);
     }
-
-    clock_t end_time = clock();
-    double time_taken = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-    printf("Time taken: %f seconds\n", time_taken);
 
     write_matrix_to_file(result, output_file);
 

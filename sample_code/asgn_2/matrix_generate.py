@@ -11,7 +11,7 @@ def generate_matrix_file(file_name, rows, cols):
                 f.write(f"{matrix[i, j]}\n")
 
 # 生成 a_matrix_file.txt 和 b_matrix_file.txt
-generate_matrix_file("a_matrix_file.txt", 1000, 1000)
-generate_matrix_file("b_matrix_file.txt", 1000, 1000)
+generate_matrix_file("a_matrix_file.txt", 1500, 1500)
+generate_matrix_file("b_matrix_file.txt", 1500, 1500)
 
 print("Matrices generated and saved to a_matrix_file.txt and b_matrix_file.txt")
